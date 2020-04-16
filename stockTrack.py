@@ -21,14 +21,13 @@ from urllib.request import urlopen
 
 from datetime import datetime
 
-start_time1 = time.time()
 #==================================================================================================
 # Stock lists
 #==================================================================================================
 # The list of stock codes that I currently own, and the list of other stock codes that I want to 
 # keep track of.
 OWNED_TICKER_LIST = ['NZX50', 'SPK', 'RYM', 'FRE', 'DIV', 'FNZ']
-POTENTIAL_TICKER_LIST = ['FNZ', 'DIV']
+POWER_TICKER_LIST = ['NZX50', 'CEN', 'GNE', 'MCY', 'MEL', 'NWF', 'TLT', 'TPW', 'VCT']
 #ENERGY_TICKER_LIST = []
 
 #==================================================================================================
@@ -108,6 +107,7 @@ def save_data(data_array, filename):
 		new_data = np.concatenate((saved_data, data_array),1)
 		np.save(filename, new_data)
 	except ValueError:
+        # This only deals with ADDING a new stock code, not removing
 		padding = np.zeros((1,len(saved_data[0,:,0]),2))
 		saved_data_padded = np.concatenate((saved_data, padding))
 		new_data = np.concatenate((saved_data_padded, data_array),1)
@@ -155,27 +155,44 @@ def send_email_update(points, percent_change, ticker):
 		server.login(sender_email, password)
 		server.sendmail(sender_email, receiver_email, message.as_string())
 
+#def get_data(ticker_list):
+	
 #==================================================================================================
 # Run
 #==================================================================================================
-owned_day_array = np.zeros((len(OWNED_TICKER_LIST),3,2))
-potential_day_array = np.zeros((len(POTENTIAL_TICKER_LIST),3,2))
+day_length = 2
+owned_array = np.zeros((len(OWNED_TICKER_LIST),day_length,2))
+power_array = np.zeros((len(POWER_TICKER_LIST),day_length,2))
 
 current_minute = int(datetime.now().isoformat(sep='T', timespec='minutes')[-2:])
+times = np.zeros((3))
 
 i = 0
-while i < len(owned_day_array[0,:,0]):
-    print(current_minute)
+while i < day_length:
     start = time.time()
+    times[i] = current_minute
+	# Update general array
     j = 0
     for ticker in OWNED_TICKER_LIST:
         if ticker=='NZX50':
             price, percent_change = get_price_nzx50()
         else:
             price, percent_change = get_stock_price(ticker)
-        owned_day_array[j,i,:] = price, percent_change
+        owned_array[j,i,:] = price, percent_change
   		# INSERT EMAIL STUFF HERE PROBABLY
         j += 1
+	# Update power company array
+    j = 0
+    for ticker in POWER_TICKER_LIST:
+        if ticker=='NZX50':
+            price, percent_change = get_price_nzx50()
+        else:
+            price, percent_change = get_stock_price(ticker)
+        power_array[j,i,:] = price, percent_change
+  		# INSERT EMAIL STUFF HERE PROBABLY
+        j += 1
+    end = time.time()
+    print(end - start)
     i += 1
   	# We want to collect data at 60s time intervals, but the program takes some time interval 
   	# to run, we have to take that into account so that we get consistent timing of data.
@@ -186,9 +203,11 @@ while i < len(owned_day_array[0,:,0]):
 	    time.sleep(20)
 
 filename = "stockData"    
-save_data(owned_day_array, filename)
+save_data(owned_array, filename)
+filename = "powerData"
+save_data(power_array, filename)
+np.save("minutes.npy", times)
 
-end_time1 = time.time()
-print(end_time1 - start_time1)
+
 
 #send_email_update(points, percent_change, "NZX50")
